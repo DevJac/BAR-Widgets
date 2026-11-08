@@ -16,6 +16,7 @@ end
 -- Set true to simulate damage and show the bar for layout testing.
 local PREVIEW = false
 local SETTINGS_PREVIEW_SECONDS = 30
+local PLAYER_COLOR_MODES = { "Never", "When spectating", "Always" }
 local SNAP_KEY = "commanderhealthbar"
 local SNAP_DIST, SNAP_GAP, SNAP_NEAR, SNAP_GRID = 10, 5, 40, 16
 local DAMAGE_HOLD = 0.025 -- Short stationary white flash before the segment starts falling.
@@ -48,7 +49,7 @@ local config = {
     heightPercent = 100,
     damageFallHeights = 10,
     damageDurationMs = 500,
-    usePlayerColor = false,
+    playerColorMode = "Never",
     showWhileSpectating = true,
 }
 local testTimer, testFrac = 0, 0.76
@@ -391,7 +392,10 @@ local function DrawShaderBar(x, y, w, h, frac, c, visibility, events)
     gl.UseShader(shader)
     gl.Uniform(uniforms.rect, x, y, w, h)
     gl.Uniform(uniforms.teamColor, c[1], c[2], c[3])
-    gl.Uniform(uniforms.usePlayerColor, config.usePlayerColor and 1 or 0)
+    local spectating = Spring.GetSpectatingState()
+    local playerColor = config.playerColorMode == "Always"
+        or (config.playerColorMode == "When spectating" and spectating)
+    gl.Uniform(uniforms.usePlayerColor, playerColor and 1 or 0)
     gl.Uniform(uniforms.health, frac)
     gl.Uniform(uniforms.opacity, 0.98)
     gl.Uniform(uniforms.visibility, visibility)
@@ -438,11 +442,13 @@ local function RegisterOptions()
                 id = "commander_healthbar__use_player_color",
                 widgetname = "Commander Health Bar",
                 name = "Use player color",
-                description = "Use your team's color instead of BAR's health-based red-to-green colors.",
-                type = "bool",
-                value = config.usePlayerColor,
+                description = "Choose when to use the viewed team's color instead of health-based colors.",
+                type = "select",
+                options = PLAYER_COLOR_MODES,
+                value = (config.playerColorMode == "Always" and 3)
+                    or (config.playerColorMode == "When spectating" and 2) or 1,
                 onchange = function(_, value)
-                    config.usePlayerColor = (value == true)
+                    config.playerColorMode = PLAYER_COLOR_MODES[tonumber(value)] or config.playerColorMode
                     StartSettingsPreview()
                 end,
             },
@@ -681,7 +687,7 @@ function widget:GetConfigData()
         heightPercent = config.heightPercent,
         damageFallHeights = config.damageFallHeights,
         damageDurationMs = config.damageDurationMs,
-        usePlayerColor = config.usePlayerColor,
+        playerColorMode = config.playerColorMode,
         showWhileSpectating = config.showWhileSpectating,
     }
 end
@@ -692,7 +698,10 @@ function widget:SetConfigData(data)
     local height = tonumber(data.heightPercent)
     local fall = tonumber(data.damageFallHeights)
     local duration = tonumber(data.damageDurationMs)
-    if type(data.usePlayerColor) == "boolean" then config.usePlayerColor = data.usePlayerColor end
+    if data.playerColorMode == "Never" or data.playerColorMode == "When spectating"
+        or data.playerColorMode == "Always" then
+        config.playerColorMode = data.playerColorMode
+    end
     if type(data.showWhileSpectating) == "boolean" then config.showWhileSpectating = data.showWhileSpectating end
     if width and width == width then config.widthPercent = Clamp(width, 30, 200) end
     if height and height == height then config.heightPercent = Clamp(height, 50, 250) end
