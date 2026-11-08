@@ -4,7 +4,7 @@ function widget:GetInfo()
     return {
         name = "Commander Health Bar",
         desc = "Commander health bar. Ctrl + left-drag to reposition.",
-        author = "Spectator HUD",
+        author = "Buttons840",
         date = "October 2026",
         license = "GNU GPL, v2 or later",
         layer = 100,
@@ -16,6 +16,7 @@ end
 -- Set true to simulate damage and show the bar for layout testing.
 local PREVIEW = false
 local SETTINGS_PREVIEW_SECONDS = 30
+local PREVIEW_MESSAGE = "Temporary preview after changing settings"
 local PLAYER_COLOR_MODES = { "Never", "When spectating", "Always" }
 local SNAP_KEY = "commanderhealthbar"
 local SNAP_DIST, SNAP_GAP, SNAP_NEAR, SNAP_GRID = 10, 5, 40, 16
@@ -163,11 +164,8 @@ local function StartSettingsPreview()
         previewRemaining = 0
         previewDamageEvents = {}
     else
-        if previewRemaining <= 0 then
-            testTimer, testFrac = 0, 0.76
-            previewDamageEvents = {}
-            AddDamage(1, testFrac, previewDamageEvents)
-        end
+        testTimer, testFrac = 0, 1.0
+        previewDamageEvents = {}
         previewRemaining = SETTINGS_PREVIEW_SECONDS
     end
     UpdateSnapRect()
@@ -581,7 +579,11 @@ function widget:Update(dt)
         if testTimer >= 1.5 then
             testTimer = testTimer - 1.5
             local before = testFrac
-            testFrac = testFrac <= 0.40 and 0.90 or (testFrac - 0.19)
+            if testFrac >= 0.999 then
+                testFrac = 0.76
+            else
+                testFrac = testFrac <= 0.40 and 1.0 or (testFrac - 0.19)
+            end
             AddDamage(before, testFrac, previewDamageEvents)
         end
     end
@@ -637,7 +639,12 @@ function widget:DrawScreen()
     local label = string.format("%d / %d", floor(current + 0.5), floor(maximum + 0.5))
     local size = max(11, min(17, floor(pos.h * 0.62)))
     gl.Color(1, 1, 1, 0.96 * visibility)
-    gl.Text(label, pos.x + pos.w * 0.5, pos.y + (pos.h - size) * 0.5 + 2, size, "oc")
+    if preview then
+        local messageSize = max(8, min(size, floor(pos.w / 24)))
+        gl.Text(PREVIEW_MESSAGE, pos.x + pos.w * 0.5, pos.y + pos.h * 0.5 - messageSize * 0.38, messageSize, "oc")
+    else
+        gl.Text(label, pos.x + pos.w * 0.5, pos.y + (pos.h - size) * 0.5 + 2, size, "oc")
+    end
     gl.Color(1, 1, 1, 1)
     if WG.tooltip and WG.tooltip.AddTooltip and WG.snapRects and WG.snapRects[SNAP_KEY] then
         WG.tooltip.AddTooltip(SNAP_KEY, WG.snapRects[SNAP_KEY],
